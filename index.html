@@ -896,12 +896,47 @@ function saveVox() {
     const c = pal[i] || [0, 0, 0];
     u8[p++] = c[0]; u8[p++] = c[1]; u8[p++] = c[2]; u8[p++] = 255;
   }
+  const name = 'tinyvoxels-' + new Date().toISOString().slice(0, 10) + '.vox';
+  if (hostDownloads) {   // inside the claude.ai viewer: .vox isn't an allowed type there, so it ships inside a .zip
+    hostDownloads.save({ filename: name.replace(/\.vox$/, '.zip'), data: zipOne(name, u8) })
+      .then(() => toast(`Saved ${count.toLocaleString()} cubes (.vox inside a .zip)`))
+      .catch((e) => { if (e && e.code !== 'declined') toast('Saving is not available here.'); });
+    return;
+  }
   const url = URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' }));
   const a = document.createElement('a');
-  a.href = url; a.download = 'tinyvoxels-' + new Date().toISOString().slice(0, 10) + '.vox';
+  a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
   toast(`Saved ${count.toLocaleString()} cubes as .vox`);
+}
+let hostDownloads = null;
+if (window.claude && window.claude.use) window.claude.use('downloads').then(d => { hostDownloads = d; }, () => {});
+
+// Minimal uncompressed .zip holding one file.
+function zipOne(name, data) {
+  let crc = -1;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+  }
+  crc = (crc ^ -1) >>> 0;
+  const nm = new TextEncoder().encode(name), L = 30 + nm.length, C = 46 + nm.length;
+  const out = new Uint8Array(L + data.length + C + 22), dv = new DataView(out.buffer);
+  const hdr = (p, central) => {
+    dv.setUint32(p, central ? 0x02014b50 : 0x04034b50, true);
+    const q = central ? p + 2 : p;           // central header has an extra "version made by" field
+    dv.setUint16(q + 4, 20, true);
+    dv.setUint32(q + 14, crc, true); dv.setUint32(q + 18, data.length, true); dv.setUint32(q + 22, data.length, true);
+    dv.setUint16(q + 26, nm.length, true);
+    out.set(nm, p + (central ? 46 : 30));
+  };
+  hdr(0, false); out.set(data, L);
+  const cd = L + data.length; hdr(cd, true);
+  const e = cd + C;
+  dv.setUint32(e, 0x06054b50, true); dv.setUint16(e + 8, 1, true); dv.setUint16(e + 10, 1, true);
+  dv.setUint32(e + 12, C, true); dv.setUint32(e + 16, cd, true);
+  return out;
 }
 
 function loadVox(buf, name) {
