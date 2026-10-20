@@ -1019,22 +1019,8 @@ function loadLocal() {
 window.addEventListener('pagehide', saveLocal);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveLocal(); });
 
-/* ---------- starter scene: a small tree ---------- */
-function starter() {
-  setWorld(32);
-  const c = 16, put = (x, y, z, v) => { if (inside(x, y, z)) vox[idx(x, y, z)] = v; };
-  for (let y = 0; y < 4; y++) put(c, y, c, 20);
-  for (let y = 3; y <= 7; y++) for (let z = c - 3; z <= c + 3; z++) for (let x = c - 3; x <= c + 3; x++) {
-    const d = Math.hypot(x - c, (y - 5) * 1.2, z - c);
-    if (d <= 2.9 && !(x === c && z === c && y < 4)) put(x, y, z, (x + y + z) % 3 === 0 ? 9 : 10);
-  }
-  for (let i = 0; i < 3; i++) put(c + 6 + i, 0, c - 4, 3);   // a few stones
-  put(c + 7, 1, c - 4, 2);
-  setWorld(32, vox);
-}
-
 /* ---------- start ---------- */
-if (!loadLocal()) starter();
+if (!loadLocal()) setWorld(32);
 renderPalette();
 selectColor(color);
 updateHistoryUI();
